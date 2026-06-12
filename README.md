@@ -94,6 +94,13 @@ Open it after a demo run:
 
 ![Audit dashboard screenshot placeholder](dashboard/screenshot.png)
 
+## For control planes
+A control plane enforces at the moment of action. This adapter makes what it
+enforced verifiable by a third party: three calls turn a dispatch loop into a
+signed, tamper-evident audit trail in ClickHouse. Works with any control plane
+that can call a function per action. Wiring it to a specific platform SDK
+(Guild, or any other) is an afternoon, not a project.
+
 ## About APS
 
 APS is an open Apache 2.0 protocol. 3,791 tests in the SDK suite.
