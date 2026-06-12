@@ -1,0 +1,24 @@
+{
+  "name": "aps-clickhouse-receipts",
+  "version": "0.1.0",
+  "description": "APS signed receipts in ClickHouse next to agent traces. One JOIN finds behavior outside authority.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Tymofii Pidlisnyi",
+  "scripts": {
+    "emit": "tsx src/emit.ts",
+    "verify": "tsx src/verify.ts",
+    "tamper": "tsx src/verify.ts --tamper",
+    "test": "tsx test/roundtrip.test.ts",
+    "demo": "./demo.sh"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.20.0",
+    "agent-passport-system": "2.6.0",
+    "langfuse": "^3.38.20"
+  },
+  "devDependencies": {
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3"
+  }
+}
