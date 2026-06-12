@@ -19,7 +19,13 @@ import {
   verifyPolicyReceipt,
 } from 'agent-passport-system';
 
-const client = createClient({ url: process.env.CLICKHOUSE_URL ?? 'http://localhost:8123' });
+// Same env pattern as src/. Password defaults to the compose-pinned value
+// so `npm test` works against the repo's own docker setup out of the box.
+const client = createClient({
+  url: process.env.CLICKHOUSE_URL ?? 'http://localhost:8123',
+  username: process.env.CLICKHOUSE_USER ?? 'default',
+  password: process.env.CLICKHOUSE_PASSWORD ?? 'aps_demo',
+});
 
 const TABLE = 'aps_receipts_roundtrip_test';
 await client.command({ query: `DROP TABLE IF EXISTS ${TABLE}` });
