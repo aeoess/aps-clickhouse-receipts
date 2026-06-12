@@ -21,7 +21,7 @@ import {
 } from 'agent-passport-system';
 
 const CH_URL = process.env.CLICKHOUSE_URL ?? 'http://localhost:8123';
-const client = createClient({ url: CH_URL });
+const client = createClient({ url: CH_URL, username: process.env.CLICKHOUSE_USER ?? 'default', password: process.env.CLICKHOUSE_PASSWORD ?? '' });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

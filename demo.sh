@@ -4,13 +4,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 CH_URL="${CLICKHOUSE_URL:-http://localhost:8123}"
+CH_AUTH="${CLICKHOUSE_USER:-default}:${CLICKHOUSE_PASSWORD:-}"
 START=$(date +%s)
 
 say() { printf '\n=== %s ===\n\n' "$1"; }
 
-ch_ping() { curl -s --max-time 2 "$CH_URL/ping" 2>/dev/null | grep -q Ok; }
+ch_ping() { curl -s --max-time 4 --user "$CH_AUTH" "$CH_URL/ping" 2>/dev/null | grep -q Ok; }
 
-ch_query_file() { curl -sS "$CH_URL/?default_format=PrettyCompactMonoBlock" --data-binary @"$1"; }
+ch_query_file() { curl -sS --user "$CH_AUTH" "$CH_URL/?default_format=PrettyCompactMonoBlock" --data-binary @"$1"; }
 
 # 1. Start ClickHouse. Prefer docker compose. Fall back to a local binary.
 if ch_ping; then
@@ -46,7 +47,11 @@ for stmt in sql.split(';'):
     body = '\n'.join(l for l in stmt.splitlines() if not l.strip().startswith('--')).strip()
     if not body:
         continue
-    urllib.request.urlopen(urllib.request.Request(url + '/', data=stmt.encode())).read()
+    req = urllib.request.Request(url + '/', data=stmt.encode())
+    import base64, os
+    auth = os.environ.get('CLICKHOUSE_USER','default') + ':' + os.environ.get('CLICKHOUSE_PASSWORD','')
+    req.add_header('Authorization', 'Basic ' + base64.b64encode(auth.encode()).decode())
+    urllib.request.urlopen(req).read()
 print('[schema] aps_receipts and agent_traces created')
 EOF
 

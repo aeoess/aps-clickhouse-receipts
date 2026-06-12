@@ -16,7 +16,7 @@ if (!publicKey || !secretKey) {
 const { Langfuse } = await import('langfuse');
 const { createClient } = await import('@clickhouse/client');
 
-const client = createClient({ url: process.env.CLICKHOUSE_URL ?? 'http://localhost:8123' });
+const client = createClient({ url: process.env.CLICKHOUSE_URL ?? 'http://localhost:8123', username: process.env.CLICKHOUSE_USER ?? 'default', password: process.env.CLICKHOUSE_PASSWORD ?? '' });
 
 interface TraceRow {
   trace_id: string;
