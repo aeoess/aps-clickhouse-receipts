@@ -1,0 +1,1 @@
+Q1 ops notes: the receipt pipeline moved from batch to streaming inserts in March. Median insert latency dropped from 900ms to 140ms. Two incidents, both traced to schema drift in the traces table.

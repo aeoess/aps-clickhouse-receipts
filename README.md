@@ -101,6 +101,13 @@ signed, tamper-evident audit trail in ClickHouse. Works with any control plane
 that can call a function per action. Wiring it to a specific platform SDK
 (Guild, or any other) is an afternoon, not a project.
 
+## Live Guild agent
+guild-live/ holds an agent scaffolded with the Guild CLI (guild agent init,
+LLM template) whose tool dispatch is wired through this adapter: one signed
+receipt per tool call, one out-of-scope delete denied live without executing,
+and the whole trail re-verified from ClickHouse. See guild-live/RUN.md for
+the captured run.
+
 ## About APS
 
 APS is an open Apache 2.0 protocol. 3,791 tests in the SDK suite.

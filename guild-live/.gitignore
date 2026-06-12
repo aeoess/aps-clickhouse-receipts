@@ -1,0 +1,12 @@
+.DS_Store
+.git-credentials
+agent.js.gz
+dist
+guild.json
+node_modules
+tsconfig.tsbuildinfo
+
+# Pin dependencies in package.json if you need to do so.
+package-lock.json
+.guild/cache/
+.guild-git/

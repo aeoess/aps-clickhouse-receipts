@@ -1,0 +1,1 @@
+Q2 ops notes: verification moved to read-time re-checks. One deny event surfaced a misconfigured scope on the deploy agent. Dashboard adoption is up; the audit view is now the default landing page.
