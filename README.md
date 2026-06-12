@@ -108,6 +108,12 @@ receipt per tool call, one out-of-scope delete denied live without executing,
 and the whole trail re-verified from ClickHouse. See guild-live/RUN.md for
 the captured run.
 
+## Presenter agent
+
+The demo video was produced by a receipted presenter agent: every build step
+ran as a receipt-gated tool call under a signed delegation, with one denied
+out-of-scope dispatch (publish_video). See presenter/RUN.md.
+
 ## About APS
 
 APS is an open Apache 2.0 protocol. 3,791 tests in the SDK suite.
