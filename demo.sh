@@ -4,12 +4,28 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 CH_URL="${CLICKHOUSE_URL:-http://localhost:8123}"
-CH_AUTH="${CLICKHOUSE_USER:-default}:${CLICKHOUSE_PASSWORD:-}"
+CH_USER="${CLICKHOUSE_USER:-default}"
+CH_AUTH="$CH_USER:${CLICKHOUSE_PASSWORD:-}"
 START=$(date +%s)
 
 say() { printf '\n=== %s ===\n\n' "$1"; }
 
 ch_ping() { curl -s --max-time 4 --user "$CH_AUTH" "$CH_URL/ping" 2>/dev/null | grep -q Ok; }
+
+# Find credentials the server actually accepts: the env-provided password,
+# the compose default (aps_demo), or empty (local binary). Exports the
+# working pair so emit/verify/langfuse inherit it.
+ch_resolve_auth() {
+  for pw in "${CLICKHOUSE_PASSWORD:-}" "aps_demo" ""; do
+    if curl -s --max-time 4 --user "$CH_USER:$pw" "$CH_URL/?query=SELECT%201" 2>/dev/null | grep -q '^1'; then
+      CH_AUTH="$CH_USER:$pw"
+      export CLICKHOUSE_USER="$CH_USER" CLICKHOUSE_PASSWORD="$pw"
+      return 0
+    fi
+  done
+  echo "Could not authenticate to ClickHouse at $CH_URL" >&2
+  exit 1
+}
 
 ch_query_file() { curl -sS --user "$CH_AUTH" "$CH_URL/?default_format=PrettyCompactMonoBlock" --data-binary @"$1"; }
 
@@ -37,6 +53,7 @@ for i in $(seq 1 60); do
   sleep 1
 done
 say "ClickHouse ready"
+ch_resolve_auth
 
 # 3. Apply schema. One statement per HTTP request.
 python3 - <<EOF

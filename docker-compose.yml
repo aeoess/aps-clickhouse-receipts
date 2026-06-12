@@ -2,6 +2,11 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:latest
     container_name: aps-clickhouse
+    environment:
+      # The current clickhouse-server image rejects an empty default-user
+      # password, so the demo pins one. demo.sh detects and sends it.
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: aps_demo
     ports:
       - "8123:8123"
       - "9000:9000"
