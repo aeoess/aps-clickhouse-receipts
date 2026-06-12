@@ -79,6 +79,21 @@ the step skips silently. The `agent_traces` mirror table keeps the demo
 self-contained either way: the JOIN runs against local rows, no external
 service required.
 
+## Audit dashboard (OpenUI)
+
+`dashboard/index.html` is one self-contained file. It fetches the drift JOIN
+and the receipts-per-agent rollup from ClickHouse over HTTP as JSON, then
+renders them with the OpenUI browser bundle: a callout with the count of
+actions that left authority, the drift table, and a bar chart of receipts
+per agent per decision. Connection settings live in the small `CH` config
+object at the top of the file; the defaults match `docker-compose.yml`.
+
+Open it after a demo run:
+
+    open dashboard/index.html
+
+![Audit dashboard screenshot placeholder](dashboard/screenshot.png)
+
 ## About APS
 
 APS is an open Apache 2.0 protocol. 3,791 tests in the SDK suite.

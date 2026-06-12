@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>APS Receipt Audit, rendered with OpenUI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@openuidev/browser-bundle@0.1.1/dist/openui-styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@openuidev/browser-bundle@0.1.1/dist/openui-bundle.min.js"></script>
+<style>
+  body { margin: 0; padding: 24px; background: #f6f6f4; font-family: system-ui, sans-serif; }
+  #root { max-width: 880px; margin: 0 auto; }
+  #status { max-width: 880px; margin: 0 auto 12px; color: #666; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="status">Loading receipt data from ClickHouse...</div>
+<div id="root"></div>
+<script>
+// ── Config. No secrets here: the password default mirrors the committed
+// docker-compose.yml demo value. Point at your own server by editing this
+// object or serving the file with different values.
+const CH = {
+  url: 'http://localhost:8123',
+  user: 'default',
+  password: 'aps_demo',
+};
+
+// Query over HTTP as JSON. Credentials travel as URL parameters, which is
+// ClickHouse's standard HTTP auth and keeps the request a simple CORS
+// request (an Authorization header would force a preflight that the default
+// server config does not answer). add_http_cors_header=1 makes ClickHouse
+// return Access-Control-Allow-Origin on the response.
+async function chQuery(sql) {
+  const params = new URLSearchParams({
+    user: CH.user,
+    password: CH.password,
+    add_http_cors_header: '1',
+    default_format: 'JSON',
+  });
+  const res = await fetch(`${CH.url}/?${params}`, { method: 'POST', body: sql });
+  if (!res.ok) throw new Error(`ClickHouse HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  return (await res.json()).data;
+}
+
+const DRIFT_SQL = `
+SELECT
+    t.action_ref AS action_ref,
+    r.agent_id   AS agent_id,
+    t.tool_name  AS observed_tool,
+    r.scope      AS authorized_scope,
+    r.decision   AS receipt_decision
+FROM aps_receipts AS r
+INNER JOIN agent_traces AS t USING (action_ref)
+WHERE r.decision = 'deny'
+   OR NOT has(splitByChar(',', r.scope), t.tool_name)
+ORDER BY t.ts`;
+
+const PER_AGENT_SQL = `
+SELECT agent_id, decision, count() AS receipts
+FROM aps_receipts
+GROUP BY agent_id, decision
+ORDER BY agent_id, decision`;
+
+// openui-lang string literal: double quotes, backslash escaping.
+const q = (s) => '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+const qa = (arr) => '[' + arr.map(q).join(', ') + ']';
+
+// Build the openui-lang program from live data. Statements are
+// `name = Expression`, arguments are positional, root = Card(...) is the
+// entry point. Components used: CardHeader, Callout, Table/Col (column
+// oriented), BarChart/Series.
+function buildProgram(drift, perAgent) {
+  const n = drift.length;
+  const callout = n > 0
+    ? `alert = Callout("warning", ${q(n + (n === 1 ? ' action left authority' : ' actions left authority'))}, "The trace shows behavior the receipt never authorized. Rows below; each is one JOIN match on action_ref.")`
+    : 'alert = Callout("success", "No drift detected", "Every traced action sits inside its receipted authority.")';
+
+  const cols = [
+    `c1 = Col("Agent", ${qa(drift.map(r => r.agent_id))})`,
+    `c2 = Col("Tool observed", ${qa(drift.map(r => r.observed_tool))})`,
+    `c3 = Col("Scope authorized", ${qa(drift.map(r => r.authorized_scope))})`,
+    `c4 = Col("Decision", ${qa(drift.map(r => r.receipt_decision))})`,
+  ];
+
+  const agents = [...new Set(perAgent.map(r => r.agent_id))];
+  const decisions = [...new Set(perAgent.map(r => r.decision))];
+  const seriesDefs = decisions.map((d, i) => {
+    const values = agents.map(a => {
+      const row = perAgent.find(r => r.agent_id === a && r.decision === d);
+      return row ? Number(row.receipts) : 0;
+    });
+    return `s${i} = Series(${q(d)}, [${values.join(', ')}])`;
+  });
+  const seriesRefs = decisions.map((_, i) => `s${i}`).join(', ');
+
+  return [
+    'root = Card([hdr, alert, tbl, chart])',
+    'hdr = CardHeader("APS Receipt Audit", "rendered with OpenUI")',
+    callout,
+    'tbl = Table([c1, c2, c3, c4])',
+    ...cols,
+    `chart = BarChart(${qa(agents)}, [${seriesRefs}], "grouped", "agent", "receipts")`,
+    ...seriesDefs,
+  ].join('\n');
+}
+
+(async () => {
+  const status = document.getElementById('status');
+  try {
+    const [drift, perAgent] = await Promise.all([chQuery(DRIFT_SQL), chQuery(PER_AGENT_SQL)]);
+    const code = buildProgram(drift, perAgent);
+    const { React, createRoot, Renderer, openuiChatLibrary } = window.__OpenUI;
+    createRoot(document.getElementById('root')).render(
+      React.createElement(Renderer, { response: code, library: openuiChatLibrary }),
+    );
+    status.textContent = `Live from ${CH.url}: ${drift.length} drift row(s), ${perAgent.length} agent/decision group(s).`;
+  } catch (err) {
+    status.textContent = 'Could not load data: ' + err.message
+      + ' (is ClickHouse up? run ./demo.sh first, and check the CH config object in this file)';
+  }
+})();
+</script>
+</body>
+</html>
