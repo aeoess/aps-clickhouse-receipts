@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# One command, end to end. Target runtime: under 2 minutes.
+set -euo pipefail
+cd "$(dirname "$0")"
+
+CH_URL="${CLICKHOUSE_URL:-http://localhost:8123}"
+START=$(date +%s)
+
+say() { printf '\n=== %s ===\n\n' "$1"; }
+
+ch_ping() { curl -s --max-time 2 "$CH_URL/ping" 2>/dev/null | grep -q Ok; }
+
+ch_query_file() { curl -sS "$CH_URL/?default_format=PrettyCompactMonoBlock" --data-binary @"$1"; }
+
+# 1. Start ClickHouse. Prefer docker compose. Fall back to a local binary.
+if ch_ping; then
+  say "ClickHouse already running at $CH_URL"
+elif docker info >/dev/null 2>&1; then
+  say "Starting ClickHouse via docker compose"
+  docker compose up -d
+elif [ -x bin/clickhouse ]; then
+  say "Docker unavailable. Starting the local clickhouse binary"
+  mkdir -p .ch-data
+  (cd .ch-data && nohup ../bin/clickhouse server >server.log 2>&1 &)
+else
+  echo "No ClickHouse available." >&2
+  echo "Either start Docker, or download the binary:" >&2
+  echo "  mkdir -p bin && cd bin && curl -fsSL https://clickhouse.com/ | sh" >&2
+  exit 1
+fi
+
+# 2. Wait for readiness.
+for i in $(seq 1 60); do
+  ch_ping && break
+  [ "$i" = 60 ] && { echo "ClickHouse did not become ready in 60s" >&2; exit 1; }
+  sleep 1
+done
+say "ClickHouse ready"
+
+# 3. Apply schema. One statement per HTTP request.
+python3 - <<EOF
+import urllib.request
+url = "$CH_URL"
+sql = open('schema/aps_receipts.sql').read()
+for stmt in sql.split(';'):
+    body = '\n'.join(l for l in stmt.splitlines() if not l.strip().startswith('--')).strip()
+    if not body:
+        continue
+    urllib.request.urlopen(urllib.request.Request(url + '/', data=stmt.encode())).read()
+print('[schema] aps_receipts and agent_traces created')
+EOF
+
+# 4. Emit six actions as signed receipts plus trace mirror rows.
+say "Emit: 6 agent actions, 5 in scope, 1 out of scope"
+npx tsx src/emit.ts
+
+# 5. Re-verify every receipt straight out of the store.
+say "Verify: every signature, every column binding"
+npx tsx src/verify.ts
+
+# 6. Tamper with one row, then catch it.
+say "Tamper: ALTER one row's scope, verify again"
+npx tsx src/verify.ts --tamper
+
+# 7. The money query: one JOIN finds behavior outside authority.
+say "Drift query: trace vs receipt, JOIN USING action_ref"
+ch_query_file queries/drift.sql
+
+say "Bonus: receipts per agent per decision"
+ch_query_file queries/receipts_per_agent.sql
+
+say "Bonus: receipts per delegation chain root"
+ch_query_file queries/delegation_roots.sql
+
+# 8. Optional: mirror the same actions to Langfuse. Skips without env keys.
+npx tsx src/langfuse.ts
+
+say "Done in $(( $(date +%s) - START ))s"
