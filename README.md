@@ -116,7 +116,7 @@ out-of-scope dispatch (publish_video). See presenter/RUN.md.
 
 ## About APS
 
-APS is an open Apache 2.0 protocol. 3,791 tests in the SDK suite.
+APS is an open Apache 2.0 protocol. 3,959 tests in the SDK suite.
 Specified in IETF Internet-Draft draft-pidlisnyi-aps, with contributions
 merged into Microsoft's agent governance toolkit. A hosted gateway product
 exists; this repo only uses the open SDK.
